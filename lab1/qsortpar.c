@@ -14,7 +14,7 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 6
+#define AMOUNT_THREADS 2
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
@@ -153,19 +153,19 @@ quick_sort(ThreadArgs *arg)
             quick_sort(argsright);
             }
 
-    // if (argsleft->threaded == true && argsleft->threaded == true){
-    //     for (int i = 0; i < AMOUNT_THREADS; i++){
-    //         pthread_join(threads[i], NULL);
-    //     }
+    if (argsleft->threaded == true && argsleft->threaded == true){
+        for (int i = 0; i < AMOUNT_THREADS; i++){
+            pthread_join(threads[i], NULL);
+        }
+    }
+    // if (argsleft->threaded == true){
+    //     // printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
+    //     pthread_join(threads[argsleft->t_nr], NULL);
     // }
-    if (argsleft->threaded == true){
-        // printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
-        pthread_join(threads[argsleft->t_nr], NULL);
-    }
-    if (argsright->threaded == true){
-        // printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
-        pthread_join(threads[argsright->t_nr], NULL);
-    }
+    // if (argsright->threaded == true){
+    //     // printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
+    //     pthread_join(threads[argsright->t_nr], NULL);
+    // }
 
     free(argsleft);
     free(argsright);
