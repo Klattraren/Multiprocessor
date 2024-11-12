@@ -7,12 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h> // pthread types and functions
+#include <stdbool.h> //Added bools
 
 #define KILO (1024)
 #define MEGA (1024*1024)
-#define MAX_ITEMS (64*10000)
+#define MAX_ITEMS (64*10000/2)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 0
+#define AMOUNT_THREADS 2
 
 static int *v;
 
@@ -23,7 +24,7 @@ typedef struct ThreadArgs{
     int *v;
     unsigned int low;
     unsigned int high;
-    unsigned int threads_left;
+    bool threaded;
 } ThreadArgs;
 
 //Creating X threads
@@ -109,6 +110,7 @@ quick_sort(ThreadArgs *arg)
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
+            argsleft->threaded = true;
             threads_left--;
             printf("Threads left: %d\n", threads_left);
             pthread_create(&threads[0], NULL, quick_sort, (void *)argsleft);
@@ -117,6 +119,7 @@ quick_sort(ThreadArgs *arg)
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
+            argsleft->threaded = false;
             quick_sort(argsleft);
         }
 
@@ -125,6 +128,7 @@ quick_sort(ThreadArgs *arg)
             argsright->v = v;
             argsright->low = pivot_index+1;
             argsright->high = high;
+            argsright->threaded = true;
             threads_left--;
             printf("Threads left: %d\n", threads_left);
             pthread_create(&threads[1], NULL, quick_sort, (void *)argsright);
@@ -133,10 +137,11 @@ quick_sort(ThreadArgs *arg)
             argsright->v = v;
             argsright->low = pivot_index+1;
             argsright->high = high;
+            argsright->threaded = false;
             quick_sort(argsright);
             }
 
-    if (threads_left != 0){
+    if (argsleft->threaded == true && argsleft->threaded == true){
         for (int i = 0; i < AMOUNT_THREADS; i++){
             pthread_join(threads[i], NULL);
         }
@@ -156,5 +161,5 @@ main(int argc, char **argv)
     arg.high = MAX_ITEMS-1;
 
     quick_sort(&arg);
-    print_array();
+    //print_array();
 }
