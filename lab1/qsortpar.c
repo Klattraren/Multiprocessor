@@ -11,9 +11,9 @@
 
 #define KILO (1024)
 #define MEGA (1024*1024)
-#define MAX_ITEMS (64*10000/2)
+#define MAX_ITEMS (64*10000)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 2
+#define AMOUNT_THREADS 0
 
 static int *v;
 
