@@ -4,6 +4,7 @@
  *
  ***************************************************************************/
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h> // pthread types and functions
@@ -11,9 +12,10 @@
 
 #define KILO (1024)
 #define MEGA (1024*1024)
-#define MAX_ITEMS (64*10000)
+#define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 0
+#define AMOUNT_THREADS 16
+#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
 
@@ -24,7 +26,9 @@ typedef struct ThreadArgs{
     int *v;
     unsigned int low;
     unsigned int high;
+    unsigned int t_nr;
     bool threaded;
+    unsigned int lvl;
 } ThreadArgs;
 
 //Creating X threads
@@ -48,7 +52,7 @@ init_array(void)
     int i;
     v = (int *) malloc(MAX_ITEMS*sizeof(int));
     for (i = 0; i < MAX_ITEMS; i++)
-        v[i] = rand()%10;
+        v[i] = rand();
 }
 
 static unsigned
@@ -106,46 +110,63 @@ quick_sort(ThreadArgs *arg)
 
     /* sort the two sub arrays */
     if (low < pivot_index)
-        if (threads_left != 0){
+        if (threads_left > 0 && arg->lvl < MAX_LEVELS){
+
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
             argsleft->threaded = true;
             threads_left--;
-            printf("Threads left: %d\n", threads_left);
-            pthread_create(&threads[0], NULL, quick_sort, (void *)argsleft);
+            argsleft->t_nr = threads_left;
+            argsleft->lvl = arg->lvl + 1;
+            printf("\033[0;30mThreads left: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
+            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
             argsleft->threaded = false;
+            argsleft->lvl = arg->lvl + 1;
             quick_sort(argsleft);
         }
 
     if (pivot_index < high)
-        if (threads_left != 0){
+        if (threads_left > 0 && arg->lvl < MAX_LEVELS){
+
             argsright->v = v;
             argsright->low = pivot_index+1;
             argsright->high = high;
             argsright->threaded = true;
             threads_left--;
-            printf("Threads left: %d\n", threads_left);
-            pthread_create(&threads[1], NULL, quick_sort, (void *)argsright);
+            argsright->t_nr = threads_left;
+            argsright->lvl = arg->lvl + 1;
+            printf("Threads right: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
+            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
             }
         else{
             argsright->v = v;
             argsright->low = pivot_index+1;
             argsright->high = high;
             argsright->threaded = false;
+            argsright->lvl = arg->lvl + 1;
             quick_sort(argsright);
             }
 
-    if (argsleft->threaded == true && argsleft->threaded == true){
-        for (int i = 0; i < AMOUNT_THREADS; i++){
-            pthread_join(threads[i], NULL);
-        }
+    // if (argsleft->threaded == true && argsleft->threaded == true){
+    //     for (int i = 0; i < AMOUNT_THREADS; i++){
+    //         pthread_join(threads[i], NULL);
+    //     }
+    // }
+    if (argsleft->threaded == true){
+        printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
+        pthread_join(threads[argsleft->t_nr], NULL);
     }
+    if (argsright->threaded == true){
+        printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
+        pthread_join(threads[argsright->t_nr], NULL);
+    }
+
     free(argsleft);
     free(argsright);
 }
@@ -155,10 +176,12 @@ main(int argc, char **argv)
 {
     init_array();
     //print_array();
+    printf("Max LEVELS: %d\n", MAX_LEVELS);
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
     arg.high = MAX_ITEMS-1;
+    arg.lvl = 0;
 
     quick_sort(&arg);
     //print_array();
