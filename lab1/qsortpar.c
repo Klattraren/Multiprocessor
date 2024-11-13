@@ -14,7 +14,7 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 2
+#define AMOUNT_THREADS 6
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
