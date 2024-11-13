@@ -170,19 +170,19 @@ quick_sort(ThreadArgs *arg)
     int size = argsleft->high - argsleft->low;
     /* sort the two sub arrays */
     if (low < pivot_index){
-        pthread_mutex_lock(&lock); // Locking the mutex
-        if (!isEmpty(arg->s) && (arg->lvl < MAX_LEVELS || nr_workers_last_level > 3) && size > 50000){
+        // pthread_mutex_lock(&lock); // Locking the mutex
+        if (!isEmpty(arg->s) && (arg->lvl < MAX_LEVELS || nr_workers_last_level > 3) && size > 100000){
             int thread_nr = pop(arg->s);
             initiated_thread = thread_nr;
             threads_left--;
-            pthread_mutex_unlock(&lock); // Unlocking after modifying threads_left
+            // pthread_mutex_unlock(&lock); // Unlocking after modifying threads_left
             printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with size: %d\n", threads_left, arg->lvl, argsleft->high - argsleft->low);
             if (arg->lvl == MAX_LEVELS-1)
                 nr_workers_last_level++;
             pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
         }
         else{
-            pthread_mutex_unlock(&lock);
+            // pthread_mutex_unlock(&lock);
             quick_sort(argsleft);
         }
     }
@@ -191,11 +191,11 @@ quick_sort(ThreadArgs *arg)
 
     if (initiated_thread != -1){
         printf("Joining thread nr: %d\n", initiated_thread);
-        // pthread_join(threads[initiated_thread], NULL);
-        pthread_mutex_lock(&lock);
+        pthread_join(threads[initiated_thread], NULL);
+        // pthread_mutex_lock(&lock);
         push(arg->s, initiated_thread);
         threads_left++;
-        pthread_mutex_unlock(&lock);
+        // pthread_mutex_unlock(&lock);
     }
 
     free(argsleft);
