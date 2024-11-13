@@ -14,7 +14,7 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 6
+#define AMOUNT_THREADS 12
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
@@ -119,7 +119,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
-            printf("\033[0;30mThreads left: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
+            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
@@ -141,7 +141,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsright->t_nr = threads_left;
             argsright->lvl = arg->lvl + 1;
-            printf("Threads right: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
+            printf("Threads right: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
             }
         else{
