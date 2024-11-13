@@ -9,12 +9,13 @@
 #include <stdlib.h>
 #include <pthread.h> // pthread types and functions
 #include <stdbool.h> //Added bools
+#include <queue>
 
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 8
+#define AMOUNT_THREADS 12
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
@@ -31,11 +32,6 @@ typedef struct ThreadArgs{
     unsigned int lvl;
 } ThreadArgs;
 
-//Creating X threads
-pthread_t threads[AMOUNT_THREADS-1];
-
-//Creating a variable that knows how many threads are left
-int threads_left = AMOUNT_THREADS-1;
 
 static void
 print_array(void)
@@ -186,5 +182,5 @@ main(int argc, char **argv)
     arg.lvl = 0;
 
     quick_sort(&arg);
-    print_array();
+    //print_array();
 }

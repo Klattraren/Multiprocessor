@@ -121,7 +121,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
-            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
+            //printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
@@ -143,7 +143,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsright->t_nr = threads_left;
             argsright->lvl = arg->lvl + 1;
-            printf("Threads right: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
+            //printf("Threads right: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
             }
         else{
@@ -160,10 +160,10 @@ quick_sort(ThreadArgs *arg)
     //         pthread_join(threads[i], NULL);
     //     }
     // }
-    // if (argsleft->threaded == true){
-    //     printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
-    //     pthread_join(threads[argsleft->t_nr], NULL);
-    // }
+    if (argsleft->threaded == true){
+        printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
+        pthread_join(threads[argsleft->t_nr], NULL);
+    }
     // if (argsright->threaded == true){
     //     printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
     //     pthread_join(threads[argsright->t_nr], NULL);
@@ -178,7 +178,7 @@ main(int argc, char **argv)
 {
     init_array();
     //print_array();
-    printf("Max LEVELS: %d\n", MAX_LEVELS);
+   // printf("Max LEVELS: %d\n", MAX_LEVELS);
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
