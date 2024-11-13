@@ -13,10 +13,10 @@
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
-// #define MAX_ITEMS 100
+// #define MAX_ITEMS 200
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 16
-#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))
+#define AMOUNT_THREADS 8
+#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 
 
@@ -56,6 +56,7 @@ init_array(void)
     v = (int *) malloc(MAX_ITEMS*sizeof(int));
     for (i = 0; i < MAX_ITEMS; i++)
         v[i] = rand();
+        // v[i] = rand()%100;
 }
 
 static unsigned
@@ -98,6 +99,7 @@ quick_sort(ThreadArgs *arg)
     unsigned low = arg->low;
     unsigned high = arg->high;
     int *v = arg->v;
+    // bool is_threaded = arg->threaded;
 
     unsigned pivot_index;
 
@@ -115,16 +117,19 @@ quick_sort(ThreadArgs *arg)
     //    printf("Size of array: %d\n", high-low);
     // }
     int size = high-low;
+    bool started_thread = false;
+    int thread_started = -1;
 
     /* sort the two sub arrays */
     if (low < pivot_index)
-        if (threads_left > 0 && arg->lvl < MAX_LEVELS && size > 1000000){
-
+        if (threads_left > 0 && arg->lvl < MAX_LEVELS){
+            started_thread = true;
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
             argsleft->threaded = true;
             threads_left--;
+            thread_started = threads_left;
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
             printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with size: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
@@ -163,7 +168,10 @@ quick_sort(ThreadArgs *arg)
     //     printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
     //     pthread_join(threads[argsright->t_nr], NULL);
     // }
-
+    if (arg->threaded == true){
+        pthread_join(threads[arg->t_nr], NULL);
+        printf("THREAD DONE nr: %d\n", arg->t_nr);
+    }
     free(argsleft);
     free(argsright);
 }
