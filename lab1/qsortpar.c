@@ -14,7 +14,7 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 12
+#define AMOUNT_THREADS 1
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
@@ -32,10 +32,10 @@ typedef struct ThreadArgs{
 } ThreadArgs;
 
 //Creating X threads
-pthread_t threads[AMOUNT_THREADS];
+pthread_t threads[AMOUNT_THREADS-1];
 
 //Creating a variable that knows how many threads are left
-int threads_left = AMOUNT_THREADS;
+int threads_left = AMOUNT_THREADS-1;
 
 static void
 print_array(void)
@@ -86,6 +86,8 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
     return high;
 }
 
+
+
 /*quick_sort(int *v, unsigned low, unsigned high)*/
 static void
 quick_sort(ThreadArgs *arg)
@@ -132,7 +134,7 @@ quick_sort(ThreadArgs *arg)
         }
 
     if (pivot_index < high)
-        if (threads_left > 0 && arg->lvl < MAX_LEVELS){
+        if (threads_left > 0 && arg->lvl > 100){
 
             argsright->v = v;
             argsright->low = pivot_index+1;
@@ -158,14 +160,14 @@ quick_sort(ThreadArgs *arg)
     //         pthread_join(threads[i], NULL);
     //     }
     // }
-    if (argsleft->threaded == true){
-        // printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
-        pthread_join(threads[argsleft->t_nr], NULL);
-    }
-    if (argsright->threaded == true){
-        // printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
-        pthread_join(threads[argsright->t_nr], NULL);
-    }
+    // if (argsleft->threaded == true){
+    //     printf("Joining left thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsleft->lvl, argsleft->t_nr);
+    //     pthread_join(threads[argsleft->t_nr], NULL);
+    // }
+    // if (argsright->threaded == true){
+    //     printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
+    //     pthread_join(threads[argsright->t_nr], NULL);
+    // }
 
     free(argsleft);
     free(argsright);
