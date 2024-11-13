@@ -13,10 +13,10 @@
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
-// #define MAX_ITEMS 100
+// #define MAX_ITEMS 200
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define AMOUNT_THREADS 16
-#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
+#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))+4
 
 
 
@@ -100,6 +100,7 @@ quick_sort(ThreadArgs *arg)
     int *v = arg->v;
 
     unsigned pivot_index;
+    pthread_t thread;
 
     /* no need to sort a vector of zero or one element */
     if (low >= high)
@@ -124,7 +125,7 @@ quick_sort(ThreadArgs *arg)
             argsleft->lvl = arg->lvl + 1;
             printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             printf("Right side: %d\n", high-(pivot_index+1));
-            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
+            pthread_create(&thread, NULL, quick_sort, (void *)argsleft);
             }
         else{
             argsleft->v = v;
@@ -176,5 +177,5 @@ main(int argc, char **argv)
     arg.lvl = 0;
 
     quick_sort(&arg);
-    //print_array();
+    // print_array();
 }
