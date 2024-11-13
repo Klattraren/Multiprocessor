@@ -14,11 +14,13 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 //#define MAX_ITEMS 200
-#define AMOUNT_THREADS 8
+#define AMOUNT_THREADS 12
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 static int *v;
+
+int nr_workers_last_level = 0;
 
 pthread_t threads[AMOUNT_THREADS-1];
 int threads_left = AMOUNT_THREADS-1;
@@ -169,12 +171,14 @@ quick_sort(ThreadArgs *arg)
     /* sort the two sub arrays */
     if (low < pivot_index){
         pthread_mutex_lock(&lock); // Locking the mutex
-        if (!isEmpty(arg->s) && arg->lvl < MAX_LEVELS){
+        if (!isEmpty(arg->s) && (arg->lvl < MAX_LEVELS || nr_workers_last_level > 3) && size > 50000){
             int thread_nr = pop(arg->s);
             initiated_thread = thread_nr;
             threads_left--;
             pthread_mutex_unlock(&lock); // Unlocking after modifying threads_left
             printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with size: %d\n", threads_left, arg->lvl, argsleft->high - argsleft->low);
+            if (arg->lvl == MAX_LEVELS-1)
+                nr_workers_last_level++;
             pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
         }
         else{
@@ -187,7 +191,7 @@ quick_sort(ThreadArgs *arg)
 
     if (initiated_thread != -1){
         printf("Joining thread nr: %d\n", initiated_thread);
-        pthread_join(threads[initiated_thread], NULL);
+        // pthread_join(threads[initiated_thread], NULL);
         pthread_mutex_lock(&lock);
         push(arg->s, initiated_thread);
         threads_left++;
