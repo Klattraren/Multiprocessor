@@ -15,7 +15,7 @@
 #define MAX_ITEMS (64*MEGA)
 // #define MAX_ITEMS 200
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 16
+#define AMOUNT_THREADS 8
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 
 
@@ -115,34 +115,34 @@ quick_sort(ThreadArgs *arg)
     /* sort the two sub arrays */
     if (low < pivot_index)
         if (threads_left > 0 && arg->lvl < MAX_LEVELS){
-
             argsright->v = v;
-            argsright->low = low;
-            argsright->high = pivot_index-1;
+            argsright->low = pivot_index+1;
+            argsright->high = high;
             argsright->threaded = true;
-            threads_left--;
-            argsright->t_nr = threads_left;
             argsright->lvl = arg->lvl + 1;
-            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,high-(pivot_index+1));
-            printf("Right side: %d\n", argsleft->high-argsleft->low);
-            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
+            argsright->t_nr = threads_left;
+
+            threads_left--;
+            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
+            printf("Right side: %d\n", pivot_index-low);
+            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
-            argsright->v = v;
-            argsright->low = low;
-            argsright->high = pivot_index-1;
-            argsright->threaded = false;
-            argsright->lvl = arg->lvl + 1;
-            quick_sort(argsright);
+            argsleft->v = v;
+            argsleft->low = low;
+            argsleft->high = pivot_index-1;
+            argsleft->threaded = false;
+            argsleft->lvl = arg->lvl + 1;
+            quick_sort(argsleft);
         }
 
     if (pivot_index < high){
         argsleft->v = v;
-        argsleft->low = pivot_index+1;
-        argsleft->high = high;
+        argsleft->low = low;
+        argsleft->high = pivot_index-1;
         argsleft->threaded = false;
         argsleft->lvl = arg->lvl + 1;
-        quick_sort(argsleft);
+        quick_sort(argsright);
         }
 
 
