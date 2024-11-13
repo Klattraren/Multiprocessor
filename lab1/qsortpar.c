@@ -119,7 +119,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
-            // printf("\033[0;30mThreads left: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
+            printf("\033[0;30mThreads left: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
@@ -141,7 +141,7 @@ quick_sort(ThreadArgs *arg)
             threads_left--;
             argsright->t_nr = threads_left;
             argsright->lvl = arg->lvl + 1;
-            // printf("Threads right: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
+            printf("Threads right: %d on level: \033[0;32m %d \033[0;30m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
             }
         else{
@@ -176,7 +176,7 @@ main(int argc, char **argv)
 {
     init_array();
     //print_array();
-    // printf("Max LEVELS: %d\n", MAX_LEVELS);
+    printf("Max LEVELS: %d\n", MAX_LEVELS);
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
