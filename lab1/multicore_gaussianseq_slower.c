@@ -14,7 +14,6 @@
 
 #define P_THREADS 4
 
-
 typedef double matrix[MAX_SIZE][MAX_SIZE];
 
 int	N;		/* matrix size		*/
@@ -25,14 +24,18 @@ matrix	A;		/* matrix A		*/
 double	b[MAX_SIZE];	/* vector b             */
 double	y[MAX_SIZE];	/* vector y             */
 
+
+
 typedef struct {
     int k; /* The current pivot column*/
     int chunkStart;
     int chunkEnd; 
-} ElimArgs;
+} Args;
 
 pthread_t threads[P_THREADS];
-ElimArgs* elimArgs[P_THREADS];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+Args* divArgs[P_THREADS];
+Args* elimArgs[P_THREADS];
 
 /* forward declarations */
 void work(void);
@@ -55,10 +58,21 @@ main(int argc, char **argv)
 }
 
 
+
+void 
+*Division_Function(void* args)
+{
+    Args* divArgs = (Args*) args;
+    int k = divArgs->k;
+    for (int i = divArgs->chunkStart; i < divArgs->chunkEnd && i < N; i++)
+        A[k][i] = A[k][i] / A[k][k]; /* Division step */
+    free(divArgs);
+}
+
 void
 *Elimination_Function(void* args)
 {
-    ElimArgs* elimArgs = (ElimArgs*) args;
+    Args* elimArgs = (Args*) args;
     int k = elimArgs->k;
     for (int i = elimArgs->chunkStart; i < elimArgs->chunkEnd && i < N; i++) {
         for (int j = k + 1; j < N; j++)
@@ -73,32 +87,45 @@ void
 void
 work(void)
 {
-    int c;
+    int c, h;
     
-
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-
-
     for (int k = 0; k < N; k++) { /* Outer loop */
-        for (int j = k+1; j < N; j++)
-            A[k][j] = A[k][j] / A[k][k]; /* Division step */
-        y[k] = b[k] / A[k][k];
-        A[k][k] = 1.0;
-
+        
         /* Calculating the chunk of rows that each thread will process */
         int chunkSize = N / P_THREADS;
 
-        int p = 0; /* The current p_thread */
-
-        /* The Elimination moved to separate function */
         
+
+        int pd = 0, pc = 0; /* The current p_thread */
+
+
+        /* The Division moved to separate function */
+        for (h = k + 1; h <= N; h += chunkSize) {
+            // printf("h: %d, pd: %d\n", h, pd);
+            divArgs[pd] = (Args*) malloc(sizeof(Args)); /* Allocate memory for the arguments */
+            divArgs[pd]->chunkStart = h; /* Start item in chunk of the row */
+            divArgs[pd]->chunkEnd = h + chunkSize; /* The last item in the chunk of the row */
+            divArgs[pd]->k = k; /* The current pivot column */
+            pthread_create(&threads[pd], NULL, Division_Function, divArgs[pd]);
+            pd++;
+        }
+        for (h = 0; h < P_THREADS; h++) {
+            pthread_join(threads[h], NULL);
+        }
+        y[k] = b[k] / A[k][k];
+	    A[k][k] = 1.0;
+
+
+
+        /* The Elimination moved to separate function */        
         for (c = k + 1; c < N; c += chunkSize) {
-            elimArgs[p] = (ElimArgs*) malloc(sizeof(ElimArgs)); /* Allocate memory for the arguments */
-            elimArgs[p]->k = k; /* The current pivot column */
-            elimArgs[p]->chunkStart = c; /* The first row in the chunk to perform elimination on */
-            elimArgs[p]->chunkEnd = c + chunkSize; /* The last row in the chunk to perform elimination on */
-            pthread_create(&threads[p], NULL, Elimination_Function, elimArgs[p]);
-            p++;
+            elimArgs[pc] = (Args*) malloc(sizeof(Args)); /* Allocate memory for the arguments */
+            elimArgs[pc]->k = k; /* The current pivot column */
+            elimArgs[pc]->chunkStart = c; /* The first row in the chunk to perform elimination on */
+            elimArgs[pc]->chunkEnd = c + chunkSize; /* The last row in the chunk to perform elimination on */
+            pthread_create(&threads[pc], NULL, Elimination_Function, elimArgs[pc]);
+            pc++;
         }
 
         for (c = 0; c < P_THREADS; c++) {
