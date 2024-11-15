@@ -12,7 +12,7 @@
 
 #define MAX_SIZE 4096
 
-#define P_THREADS 4
+#define P_THREADS 1
 
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
@@ -73,7 +73,6 @@ void
 void
 work(void)
 {
-    int c;
     
 
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
@@ -92,7 +91,7 @@ work(void)
 
         /* The Elimination moved to separate function */
         
-        for (c = k + 1; c < N; c += chunkSize) {
+        for (int c = k + 1; c < N; c += chunkSize) {
             elimArgs[p] = (ElimArgs*) malloc(sizeof(ElimArgs)); /* Allocate memory for the arguments */
             elimArgs[p]->k = k; /* The current pivot column */
             elimArgs[p]->chunkStart = c; /* The first row in the chunk to perform elimination on */
@@ -101,7 +100,7 @@ work(void)
             p++;
         }
 
-        for (c = 0; c < P_THREADS; c++) {
+        for (int c = 0; c < p; c++) {
             pthread_join(threads[c], NULL);
         }
     }
@@ -176,10 +175,10 @@ Print_Matrix()
 void
 Init_Default()
 {
-    N = 4096;
+    N = 16;
     Init = "rand";
     maxnum = 15.0;
-    PRINT = 0;
+    PRINT = 1;
 }
 
 int
