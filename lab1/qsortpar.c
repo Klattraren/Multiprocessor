@@ -14,11 +14,11 @@
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
-// #define MAX_ITEMS 200000
-#define AMOUNT_THREADS 5
+//#define MAX_ITEMS 20000000
+#define AMOUNT_THREADS 16
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
-#define MIN_ITEMS 100000
+#define MIN_ITEMS 500000
 
 
 static int *v;
@@ -43,59 +43,69 @@ typedef struct ThreadArgs {
     unsigned int lvl;
 } ThreadArgs;
 
-typedef struct Stack {
-    ThreadArgs data[(MAX_ITEMS/MIN_ITEMS)]; // Use struct ThreadArgs
-    int top;
-} Stack;
+typedef struct Queue {
+    ThreadArgs data[(MAX_ITEMS / MIN_ITEMS)]; // Use struct ThreadArgs
+    int front;
+    int rear;
+    int size;
+} Queue;
 
-//Stack pointer
-Stack *sp;
+// Queue pointer
+Queue *qp;
 
-
-// Initialize the stack
-void initStack(Stack* s) {
-    s->top = -1;
+// Initialize the queue
+void initQueue(Queue *q) {
+    q->front = 0;
+    q->rear = -1;
+    q->size = 0;
 }
 
-// Check if the stack is empty
-int isEmpty(Stack* s) {
-    return s->top == -1;
+// Check if the queue is empty
+bool isQueueEmpty(Queue *q) {
+    return q->size == 0;
 }
 
-// Check if the stack is full
-int isFull(Stack* s) {
-    return s->top == (MAX_ITEMS/MIN_ITEMS) - 1;
+// Check if the queue is full
+bool isQueueFull(Queue *q) {
+    // printf("Queue size from que full: %d\n", q->size);
+    // printf("Que front: %d\n", q->front);
+    return q->size == (MAX_ITEMS / MIN_ITEMS);
 }
 
-// Push an integer onto the stack
-// Push a ThreadArgs onto the stack
-void push(Stack *s, ThreadArgs value) {
-    if (isFull(s)) {
-        printf("Stack overflow\n");
+// Enqueue a ThreadArgs into the queue
+void enqueue(Queue *q, ThreadArgs value) {
+    if (isQueueFull(q)) {
+        printf("Queue overflow\n");
         return;
     }
-    s->data[++(s->top)] = value;
-    // printf("Pushed to stack\n");
+    q->rear = (q->rear + 1) % (MAX_ITEMS / MIN_ITEMS); // Wrap around using modulo
+    q->data[q->rear] = value;
+    q->size++;
+    // printf("Queue size from enqueue: %d\n", q->size);
+    // printf("Enqueued to queue\n");
 }
 
-// Pop a ThreadArgs from the stack
-ThreadArgs pop(Stack *s) {
-    if (isEmpty(s)) {
-        printf("Stack underflow\n");
-        ThreadArgs empty = {0}; // Return an empty ThreadArgs if the stack is empty
+// Dequeue a ThreadArgs from the queue
+ThreadArgs dequeue(Queue *q) {
+    if (isQueueEmpty(q)) {
+        printf("Queue underflow\n");
+        ThreadArgs empty = {0}; // Return an empty ThreadArgs if the queue is empty
         return empty;
     }
-    return s->data[(s->top)--];
+    else{
+        ThreadArgs value = q->data[q->front];
+        q->front = (q->front + 1) % (MAX_ITEMS / MIN_ITEMS); // Wrap around using modulo
+        q->size--;
+        // printf("Queue size from dequeue: %d\n", q->size);
+        return value;
+    }
 }
-
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
-
-
 
 static void
 print_array(void)
@@ -181,13 +191,12 @@ quick_sort(ThreadArgs *arg)
     argsleft->v = v;
 
     bool started_task = false;
-    int size = argsleft->high - argsleft->low;
     /* sort the two sub arrays */
     if (low < pivot_index){
         pthread_mutex_lock(&lock);
-        if (size > MIN_ITEMS && AMOUNT_THREADS > 1){
+        if ((argsleft->high-argsleft->low) > MIN_ITEMS && AMOUNT_THREADS > 1){
             // printf("Assigning work from lvl: %d of size: %d ",arg->lvl, argsleft->high - argsleft->low);
-            push(sp, *argsleft);
+            enqueue(qp, *argsleft);
             pthread_mutex_unlock(&lock);
             started_task = true;
             // pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
@@ -211,16 +220,15 @@ quick_sort(ThreadArgs *arg)
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
-void work(){}
 
 void worker(){
     printf("Worker started\n");
     while (!stop_threads){
         pthread_mutex_lock(&lock);
-        if (!isEmpty(sp)){
+        if (!isQueueEmpty(qp)){
             // printf("Taking on work\n");
             ThreadArgs *task = (ThreadArgs *)malloc(sizeof(ThreadArgs));
-            *task = pop(sp);
+            *task = dequeue(qp);
             pthread_mutex_unlock(&lock);
             quick_sort(task);
             free(task);
@@ -240,9 +248,9 @@ main(int argc, char **argv)
 {
 
     init_array();
-    Stack s;
-    sp = &s;
-    initStack(sp);
+    Queue q;
+    qp = &q;
+    initQueue(qp);
     // print_array();
     ThreadArgs arg;
     arg.v = v;
@@ -256,10 +264,17 @@ main(int argc, char **argv)
 
     quick_sort(&arg);
     printf("Done\n");
-    //Joining the threads
-    while (!isEmpty(sp)){
-        sleep(0.1);
+    // Joining the threads
+    sleep(1);
+    bool end = false;
+    while (!end){
+        printf("Checking if queue is empty\n");
+        if (isQueueEmpty(qp)){
+            end = true;
+        }
+        sleep(0.2);
     }
+    // sleep(2);
 
     stop_threads = true;
     for (int i = 0; i < AMOUNT_THREADS-1; i++){
@@ -270,5 +285,5 @@ main(int argc, char **argv)
 
     if (DEBUG)
         print_array();
-    //print_array();
+    // print_array();
 }
