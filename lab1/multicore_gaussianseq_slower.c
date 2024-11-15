@@ -12,7 +12,7 @@
 
 #define MAX_SIZE 4096
 
-#define P_THREADS 4
+#define P_THREADS 8
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
 
@@ -87,7 +87,6 @@ void
 void
 work(void)
 {
-    int c, h;
     
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (int k = 0; k < N; k++) { /* Outer loop */
@@ -101,7 +100,7 @@ work(void)
 
 
         /* The Division moved to separate function */
-        for (h = k + 1; h <= N; h += chunkSize) {
+        for (int h = k + 1; h <= N; h += chunkSize) {
             // printf("h: %d, pd: %d\n", h, pd);
             divArgs[pd] = (Args*) malloc(sizeof(Args)); /* Allocate memory for the arguments */
             divArgs[pd]->chunkStart = h; /* Start item in chunk of the row */
@@ -110,7 +109,7 @@ work(void)
             pthread_create(&threads[pd], NULL, Division_Function, divArgs[pd]);
             pd++;
         }
-        for (h = 0; h < P_THREADS; h++) {
+        for (int h = 0; h < pd; h++) {
             pthread_join(threads[h], NULL);
         }
         y[k] = b[k] / A[k][k];
@@ -119,7 +118,7 @@ work(void)
 
 
         /* The Elimination moved to separate function */        
-        for (c = k + 1; c < N; c += chunkSize) {
+        for (int c = k + 1; c < N; c += chunkSize) {
             elimArgs[pc] = (Args*) malloc(sizeof(Args)); /* Allocate memory for the arguments */
             elimArgs[pc]->k = k; /* The current pivot column */
             elimArgs[pc]->chunkStart = c; /* The first row in the chunk to perform elimination on */
@@ -128,7 +127,7 @@ work(void)
             pc++;
         }
 
-        for (c = 0; c < P_THREADS; c++) {
+        for (int c = 0; c < pc; c++) {
             pthread_join(threads[c], NULL);
         }
     }
@@ -203,7 +202,7 @@ Print_Matrix()
 void
 Init_Default()
 {
-    N = 4096;
+    N = 2048;
     Init = "rand";
     maxnum = 15.0;
     PRINT = 0;
