@@ -8,18 +8,21 @@
 #include <stdlib.h>
 #include <pthread.h> // pthread types and functions
 #include <stdbool.h> // Added bools
+#include<unistd.h>
 #define DEBUG false
 
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
-//#define MAX_ITEMS 200
-#define AMOUNT_THREADS 4
+// #define MAX_ITEMS 200000
+#define AMOUNT_THREADS 5
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
+#define MIN_ITEMS 100000
 
 
 static int *v;
+bool stop_threads = false;
 
 int nr_workers_last_level = 0;
 
@@ -41,7 +44,7 @@ typedef struct ThreadArgs {
 } ThreadArgs;
 
 typedef struct Stack {
-    ThreadArgs data[AMOUNT_THREADS * 10]; // Use struct ThreadArgs
+    ThreadArgs data[(MAX_ITEMS/MIN_ITEMS)]; // Use struct ThreadArgs
     int top;
 } Stack;
 
@@ -61,7 +64,7 @@ int isEmpty(Stack* s) {
 
 // Check if the stack is full
 int isFull(Stack* s) {
-    return s->top == AMOUNT_THREADS - 2;
+    return s->top == (MAX_ITEMS/MIN_ITEMS) - 1;
 }
 
 // Push an integer onto the stack
@@ -72,7 +75,7 @@ void push(Stack *s, ThreadArgs value) {
         return;
     }
     s->data[++(s->top)] = value;
-    printf("Pushed to stack\n");
+    // printf("Pushed to stack\n");
 }
 
 // Pop a ThreadArgs from the stack
@@ -87,19 +90,6 @@ ThreadArgs pop(Stack *s) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
-void worker(bool stop){
-    while (!stop){
-        if (!isEmpty(sp)){
-            printf("Taking on work");
-            pthread_mutex_lock(&lock);
-            ThreadArgs *new_arg = (ThreadArgs *)malloc(sizeof(ThreadArgs));
-            *new_arg = pop(sp);
-            pthread_mutex_unlock(&lock);
-            quick_sort(new_arg);
-            free(new_arg);
-        }
-    }
-}
 
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -190,35 +180,60 @@ quick_sort(ThreadArgs *arg)
     argsleft->low = low;
     argsleft->v = v;
 
-    int initiated_thread = -1;
+    bool started_task = false;
     int size = argsleft->high - argsleft->low;
     /* sort the two sub arrays */
     if (low < pivot_index){
-        if (size > 100000){
-            printf("Assigning work from lvl: %d of size: %d ",arg->lvl, argsleft->high - argsleft->low);
+        pthread_mutex_lock(&lock);
+        if (size > MIN_ITEMS && AMOUNT_THREADS > 1){
+            // printf("Assigning work from lvl: %d of size: %d ",arg->lvl, argsleft->high - argsleft->low);
             push(sp, *argsleft);
+            pthread_mutex_unlock(&lock);
+            started_task = true;
             // pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
         }
         else{
             pthread_mutex_unlock(&lock);
             quick_sort(argsleft);
+            free(argsleft);
         }
     }
-    if (pivot_index < high)
+    if (pivot_index < high){
         quick_sort(argsright);
+    }
 
-    // if (initiated_thread != -1){
-    //     printf("Joining thread nr: %d\n", initiated_thread);
-    //     pthread_join(threads[initiated_thread], NULL);
-    //     pthread_mutex_lock(&lock);
-    //     push(arg->s, initiated_thread);
-    //     threads_left++;
-    //     pthread_mutex_unlock(&lock);
-    // }
-
-    free(argsleft);
     free(argsright);
+    if (started_task)
+        free(argsleft);
+
+    // print_array();
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+void work(){}
+
+void worker(){
+    printf("Worker started\n");
+    while (!stop_threads){
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(sp)){
+            // printf("Taking on work\n");
+            ThreadArgs *task = (ThreadArgs *)malloc(sizeof(ThreadArgs));
+            *task = pop(sp);
+            pthread_mutex_unlock(&lock);
+            quick_sort(task);
+            free(task);
+        }
+        else{
+            pthread_mutex_unlock(&lock);
+        }
+    }
+    printf("Worker stopped\n");
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
 
 int
 main(int argc, char **argv)
@@ -228,20 +243,31 @@ main(int argc, char **argv)
     Stack s;
     sp = &s;
     initStack(sp);
-    //print_array();
+    // print_array();
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
     arg.high = MAX_ITEMS - 1;
     arg.lvl = 0;
-
-    bool stop = false;
     //Creating a thread
-    for (int i = 0; i < AMOUNT_THREADS; i++){
-        pthread_create(&threads[i], NULL, worker, (void *)&stop);
+    for (int i = 0; i < AMOUNT_THREADS-1; i++){
+        pthread_create(&threads[i], NULL, worker, NULL);
     }
 
     quick_sort(&arg);
+    printf("Done\n");
+    //Joining the threads
+    while (!isEmpty(sp)){
+        sleep(0.1);
+    }
+
+    stop_threads = true;
+    for (int i = 0; i < AMOUNT_THREADS-1; i++){
+        printf("Joining thread: %d\n", i);
+        pthread_join(threads[i], NULL);
+        printf("Joined thread: %d\n", i);
+    }
+
     if (DEBUG)
         print_array();
     //print_array();
