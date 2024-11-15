@@ -15,7 +15,7 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 //#define MAX_ITEMS 20000000
-#define AMOUNT_THREADS 16
+#define AMOUNT_THREADS 4
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
 #define MIN_ITEMS 500000
@@ -24,10 +24,7 @@
 static int *v;
 bool stop_threads = false;
 
-int nr_workers_last_level = 0;
-
 pthread_t threads[AMOUNT_THREADS-1];
-int threads_left = AMOUNT_THREADS-1;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -78,10 +75,13 @@ void enqueue(Queue *q, ThreadArgs value) {
         printf("Queue overflow\n");
         return;
     }
+    // if (q->rear == (MAX_ITEMS / MIN_ITEMS)-1) {
+    //     q->rear = 0;
+    // }else{q->rear++;}
     q->rear = (q->rear + 1) % (MAX_ITEMS / MIN_ITEMS); // Wrap around using modulo
     q->data[q->rear] = value;
     q->size++;
-    // printf("Queue size from enqueue: %d\n", q->size);
+    printf("Queue size from enqueue: %d\n", q->size);
     // printf("Enqueued to queue\n");
 }
 
@@ -96,7 +96,7 @@ ThreadArgs dequeue(Queue *q) {
         ThreadArgs value = q->data[q->front];
         q->front = (q->front + 1) % (MAX_ITEMS / MIN_ITEMS); // Wrap around using modulo
         q->size--;
-        // printf("Queue size from dequeue: %d\n", q->size);
+        printf("Queue size from dequeue: %d\n", q->size);
         return value;
     }
 }
@@ -265,16 +265,14 @@ main(int argc, char **argv)
     quick_sort(&arg);
     printf("Done\n");
     // Joining the threads
-    sleep(1);
     bool end = false;
     while (!end){
-        printf("Checking if queue is empty\n");
+        // printf("Checking if queue is empty\n");
         if (isQueueEmpty(qp)){
             end = true;
         }
         sleep(0.2);
     }
-    // sleep(2);
 
     stop_threads = true;
     for (int i = 0; i < AMOUNT_THREADS-1; i++){
@@ -285,5 +283,4 @@ main(int argc, char **argv)
 
     if (DEBUG)
         print_array();
-    // print_array();
 }
