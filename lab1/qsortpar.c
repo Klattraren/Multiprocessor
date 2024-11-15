@@ -14,9 +14,10 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 //#define MAX_ITEMS 200
-#define AMOUNT_THREADS 12
+#define AMOUNT_THREADS 4
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
+
 
 static int *v;
 
@@ -29,11 +30,24 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
+//The stack should take quciksort pointers
+typedef struct ThreadArgs {
+    int *v;
+    unsigned int low;
+    unsigned int high;
+    unsigned int t_nr;
+    bool threaded;
+    unsigned int lvl;
+} ThreadArgs;
 
-typedef struct {
-    int data[AMOUNT_THREADS-1];
+typedef struct Stack {
+    ThreadArgs data[AMOUNT_THREADS * 10]; // Use struct ThreadArgs
     int top;
 } Stack;
+
+//Stack pointer
+Stack *sp;
+
 
 // Initialize the stack
 void initStack(Stack* s) {
@@ -51,35 +65,46 @@ int isFull(Stack* s) {
 }
 
 // Push an integer onto the stack
-void push(Stack* s, int value) {
+// Push a ThreadArgs onto the stack
+void push(Stack *s, ThreadArgs value) {
     if (isFull(s)) {
         printf("Stack overflow\n");
         return;
     }
     s->data[++(s->top)] = value;
+    printf("Pushed to stack\n");
 }
 
-// Pop an integer from the stack
-int pop(Stack* s) {
+// Pop a ThreadArgs from the stack
+ThreadArgs pop(Stack *s) {
     if (isEmpty(s)) {
         printf("Stack underflow\n");
-        return -1;  // Return -1 if the stack is empty
+        ThreadArgs empty = {0}; // Return an empty ThreadArgs if the stack is empty
+        return empty;
     }
     return s->data[(s->top)--];
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
+void worker(bool stop){
+    while (!stop){
+        if (!isEmpty(sp)){
+            printf("Taking on work");
+            pthread_mutex_lock(&lock);
+            ThreadArgs *new_arg = (ThreadArgs *)malloc(sizeof(ThreadArgs));
+            *new_arg = pop(sp);
+            pthread_mutex_unlock(&lock);
+            quick_sort(new_arg);
+            free(new_arg);
+        }
+    }
+}
 
-typedef struct ThreadArgs{
-    int *v;
-    unsigned int low;
-    unsigned int high;
-    unsigned int t_nr;
-    bool threaded;
-    unsigned int lvl;
-    Stack *s;
-} ThreadArgs;
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+
 
 
 static void
@@ -134,7 +159,7 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
     return high;
 }
 
-static void
+void
 quick_sort(ThreadArgs *arg)
 {
     unsigned pivot_index;
@@ -154,7 +179,6 @@ quick_sort(ThreadArgs *arg)
     pivot_index = partition(v, low, high, pivot_index);
 
     //Setting up the left and right arguments
-    argsleft->s = argsright->s = arg->s;
     argsleft->v = argsright->v = v;
     argsleft->lvl = argsright->lvl = arg->lvl + 1;
 
@@ -170,16 +194,10 @@ quick_sort(ThreadArgs *arg)
     int size = argsleft->high - argsleft->low;
     /* sort the two sub arrays */
     if (low < pivot_index){
-        pthread_mutex_lock(&lock); // Locking the mutex
-        if (!isEmpty(arg->s) && (arg->lvl < MAX_LEVELS || nr_workers_last_level > 3) && size > 100000){
-            int thread_nr = pop(arg->s);
-            initiated_thread = thread_nr;
-            threads_left--;
-            pthread_mutex_unlock(&lock); // Unlocking after modifying threads_left
-            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with size: %d\n", threads_left, arg->lvl, argsleft->high - argsleft->low);
-            if (arg->lvl == MAX_LEVELS-1)
-                nr_workers_last_level++;
-            pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
+        if (size > 100000){
+            printf("Assigning work from lvl: %d of size: %d ",arg->lvl, argsleft->high - argsleft->low);
+            push(sp, *argsleft);
+            // pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
         }
         else{
             pthread_mutex_unlock(&lock);
@@ -189,14 +207,14 @@ quick_sort(ThreadArgs *arg)
     if (pivot_index < high)
         quick_sort(argsright);
 
-    if (initiated_thread != -1){
-        printf("Joining thread nr: %d\n", initiated_thread);
-        pthread_join(threads[initiated_thread], NULL);
-        pthread_mutex_lock(&lock);
-        push(arg->s, initiated_thread);
-        threads_left++;
-        pthread_mutex_unlock(&lock);
-    }
+    // if (initiated_thread != -1){
+    //     printf("Joining thread nr: %d\n", initiated_thread);
+    //     pthread_join(threads[initiated_thread], NULL);
+    //     pthread_mutex_lock(&lock);
+    //     push(arg->s, initiated_thread);
+    //     threads_left++;
+    //     pthread_mutex_unlock(&lock);
+    // }
 
     free(argsleft);
     free(argsright);
@@ -208,17 +226,20 @@ main(int argc, char **argv)
 
     init_array();
     Stack s;
-    initStack(&s);
-    for (int i = 0; i < AMOUNT_THREADS-1; i++) {
-        push(&s, i);
-    }
+    sp = &s;
+    initStack(sp);
     //print_array();
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
     arg.high = MAX_ITEMS - 1;
     arg.lvl = 0;
-    arg.s = &s;
+
+    bool stop = false;
+    //Creating a thread
+    for (int i = 0; i < AMOUNT_THREADS; i++){
+        pthread_create(&threads[i], NULL, worker, (void *)&stop);
+    }
 
     quick_sort(&arg);
     if (DEBUG)
