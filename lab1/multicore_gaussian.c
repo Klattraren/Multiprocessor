@@ -12,7 +12,7 @@
 
 #define MAX_SIZE 4096
 
-#define P_THREADS 1
+#define P_THREADS 8
 
 
 typedef double matrix[MAX_SIZE][MAX_SIZE];
@@ -175,10 +175,10 @@ Print_Matrix()
 void
 Init_Default()
 {
-    N = 16;
+    N = 2048;
     Init = "rand";
     maxnum = 15.0;
-    PRINT = 1;
+    PRINT = 0;
 }
 
 int

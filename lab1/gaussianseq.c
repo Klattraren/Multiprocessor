@@ -126,10 +126,10 @@ Print_Matrix()
 void
 Init_Default()
 {
-    N = 16;
+    N = 2048;
     Init = "rand";
     maxnum = 15.0;
-    PRINT = 1;
+    PRINT = 0;
 }
 
 int
