@@ -16,10 +16,10 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 // #define MAX_ITEMS 20000000
-#define AMOUNT_THREADS 2
+#define AMOUNT_THREADS 4
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
-#define MIN_ITEMS 100000
+#define MIN_ITEMS 50000
 
 static int *v;
 bool stop_threads = false;
@@ -265,16 +265,6 @@ main(int argc, char **argv)
         pthread_mutex_unlock(&lock);
         quick_sort(task);
         free(task);
-    }
-
-
-    bool end = false;
-    while (!end){
-        // printf("Checking if queue is empty\n");
-        if (isQueueEmpty(qp)){
-            end = true;
-        }
-        sleep(0.2);
     }
 
     stop_threads = true;
