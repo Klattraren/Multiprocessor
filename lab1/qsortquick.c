@@ -15,11 +15,10 @@
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 6
+#define AMOUNT_THREADS 32
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))
 
 //adding mutex
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int *v;
 
@@ -160,7 +159,6 @@ quick_sort(ThreadArgs *arg)
 
     /* sort the two sub arrays */
     if (low < pivot_index)
-        pthread_mutex_lock(&lock);
         if (threads_left > 0 && arg->lvl < MAX_LEVELS){
             // int thread_nr = pop(sp);
             // printf("Popped from stack with thread nr: %d\n", thread_nr);
@@ -171,14 +169,12 @@ quick_sort(ThreadArgs *arg)
             argsleft->threaded = true;
             // pthread_mutex_lock(&lock);
             threads_left--;
-            pthread_mutex_unlock(&lock);
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
             printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
-            pthread_mutex_unlock(&lock);
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;

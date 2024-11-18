@@ -9,17 +9,17 @@
 #include <pthread.h> // pthread types and functions
 #include <stdbool.h> // Added bools
 #include<unistd.h>
+
 #define DEBUG false
 
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
-//#define MAX_ITEMS 20000000
+// #define MAX_ITEMS 20000000
 #define AMOUNT_THREADS 2
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
 #define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
-#define MIN_ITEMS 500000
-
+#define MIN_ITEMS 100000
 
 static int *v;
 bool stop_threads = false;
@@ -64,8 +64,6 @@ bool isQueueEmpty(Queue *q) {
 
 // Check if the queue is full
 bool isQueueFull(Queue *q) {
-    // printf("Queue size from que full: %d\n", q->size);
-    // printf("Que front: %d\n", q->front);
     return q->size == (MAX_ITEMS / MIN_ITEMS);
 }
 
@@ -75,14 +73,10 @@ void enqueue(Queue *q, ThreadArgs value) {
         printf("Queue overflow\n");
         return;
     }
-    // if (q->rear == (MAX_ITEMS / MIN_ITEMS)-1) {
-    //     q->rear = 0;
-    // }else{q->rear++;}
     q->rear = (q->rear + 1) % (MAX_ITEMS / MIN_ITEMS); // Wrap around using modulo
     q->data[q->rear] = value;
     q->size++;
     printf("Queue size from enqueue: %d\n", q->size);
-    // printf("Enqueued to queue\n");
 }
 
 // Dequeue a ThreadArgs from the queue
@@ -100,9 +94,6 @@ ThreadArgs dequeue(Queue *q) {
         return value;
     }
 }
-/////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////
-
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
@@ -193,16 +184,16 @@ quick_sort(ThreadArgs *arg)
     bool started_task = false;
     /* sort the two sub arrays */
     if (low < pivot_index){
-        pthread_mutex_lock(&lock);
         if ((argsleft->high-argsleft->low) > MIN_ITEMS && AMOUNT_THREADS > 1){
             // printf("Assigning work from lvl: %d of size: %d ",arg->lvl, argsleft->high - argsleft->low);
+            pthread_mutex_lock(&lock);
             enqueue(qp, *argsleft);
             pthread_mutex_unlock(&lock);
             started_task = true;
+            free(argsleft);
             // pthread_create(&threads[thread_nr], NULL, (void *)quick_sort, (void *)argsleft);
         }
         else{
-            pthread_mutex_unlock(&lock);
             quick_sort(argsleft);
             free(argsleft);
         }
@@ -212,8 +203,8 @@ quick_sort(ThreadArgs *arg)
     }
 
     free(argsright);
-    if (started_task)
-        free(argsleft);
+    // if (started_task)
+    //     free(argsleft);
 
     // print_array();
 }
@@ -221,12 +212,13 @@ quick_sort(ThreadArgs *arg)
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 
-void worker(){
-    printf("Worker started\n");
+void worker(int *arg){
+    printf("Worker nr %d started\n", arg);
     while (!stop_threads){
         pthread_mutex_lock(&lock);
+        // printf("Checking if queue is empty\n");
         if (!isQueueEmpty(qp)){
-            // printf("Taking on work\n");
+            // printf("Worker nr %d found work\n", arg);
             ThreadArgs *task = (ThreadArgs *)malloc(sizeof(ThreadArgs));
             *task = dequeue(qp);
             pthread_mutex_unlock(&lock);
@@ -252,19 +244,30 @@ main(int argc, char **argv)
     qp = &q;
     initQueue(qp);
     // print_array();
+
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
     arg.high = MAX_ITEMS - 1;
     arg.lvl = 0;
+
     //Creating a thread
     for (int i = 0; i < AMOUNT_THREADS-1; i++){
-        pthread_create(&threads[i], NULL, worker, NULL);
+        pthread_create(&threads[i], NULL, worker, i);
     }
 
     quick_sort(&arg);
     printf("Done\n");
     // Joining the threads
+    while(!isQueueEmpty(qp)){
+        ThreadArgs *task = (ThreadArgs *)malloc(sizeof(ThreadArgs));
+        *task = dequeue(qp);
+        pthread_mutex_unlock(&lock);
+        quick_sort(task);
+        free(task);
+    }
+
+
     bool end = false;
     while (!end){
         // printf("Checking if queue is empty\n");
