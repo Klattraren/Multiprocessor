@@ -9,13 +9,17 @@
 #include <stdlib.h>
 #include <pthread.h> // pthread types and functions
 #include <stdbool.h> //Added bools
+#include<unistd.h>
 
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
 #define swap(v, a, b) {unsigned tmp; tmp=v[a]; v[a]=v[b]; v[b]=tmp;}
-#define AMOUNT_THREADS 2
-#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))-1
+#define AMOUNT_THREADS 6
+#define MAX_LEVELS (int)ceil(log2(AMOUNT_THREADS + 1))
+
+//adding mutex
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int *v;
 
@@ -36,6 +40,50 @@ pthread_t threads[AMOUNT_THREADS-1];
 
 //Creating a variable that knows how many threads are left
 int threads_left = AMOUNT_THREADS-1;
+
+typedef struct Stack {
+    int data[AMOUNT_THREADS-1]; // Use struct ThreadArgs
+    int top;
+} Stack;
+
+//Stack pointer
+Stack *sp;
+
+
+// Initialize the stack
+void initStack(Stack* s) {
+    s->top = -1;
+}
+
+// Check if the stack is empty
+int isEmpty(Stack* s) {
+    return s->top == -1;
+}
+
+// Check if the stack is full
+int isFull(Stack* s) {
+    return s->top == (AMOUNT_THREADS) - 1;
+}
+
+// Push an integer onto the stack
+// Push a ThreadArgs onto the stack
+void push(Stack *s, int value) {
+    if (isFull(s)) {
+        printf("Stack overflow\n");
+        return;
+    }
+    s->data[++(s->top)] = value;
+    printf("Pushed to stack\n");
+}
+
+// Pop a ThreadArgs from the stack
+int pop(Stack *s) {
+    if (isEmpty(s)) {
+        printf("Stack underflow\n");
+        return -1;
+    }
+    return s->data[(s->top)--];
+}
 
 static void
 print_array(void)
@@ -112,19 +160,25 @@ quick_sort(ThreadArgs *arg)
 
     /* sort the two sub arrays */
     if (low < pivot_index)
+        pthread_mutex_lock(&lock);
         if (threads_left > 0 && arg->lvl < MAX_LEVELS){
-
+            // int thread_nr = pop(sp);
+            // printf("Popped from stack with thread nr: %d\n", thread_nr);
+            // pthread_mutex_unlock(&lock);
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
             argsleft->threaded = true;
+            // pthread_mutex_lock(&lock);
             threads_left--;
+            pthread_mutex_unlock(&lock);
             argsleft->t_nr = threads_left;
             argsleft->lvl = arg->lvl + 1;
-            //printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
+            printf("\033[0;37mThreads left: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsleft->lvl,argsleft->high-argsleft->low);
             pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsleft);
             }
         else{
+            pthread_mutex_unlock(&lock);
             argsleft->v = v;
             argsleft->low = low;
             argsleft->high = pivot_index-1;
@@ -133,27 +187,20 @@ quick_sort(ThreadArgs *arg)
             quick_sort(argsleft);
         }
 
-    if (pivot_index < high)
-        if (threads_left > 0 && arg->lvl > 100){
+    if (pivot_index < high){
+        argsright->v = v;
+        argsright->low = pivot_index+1;
+        argsright->high = high;
+        argsright->threaded = false;
+        argsright->lvl = arg->lvl + 1;
+        quick_sort(argsright);
+        }
 
-            argsright->v = v;
-            argsright->low = pivot_index+1;
-            argsright->high = high;
-            argsright->threaded = true;
-            threads_left--;
-            argsright->t_nr = threads_left;
-            argsright->lvl = arg->lvl + 1;
-            //printf("Threads right: %d on level: \033[0;32m %d \033[0;37m with amount: %d\n", threads_left, argsright->lvl,argsright->high-argsright->low);
-            pthread_create(&threads[threads_left], NULL, quick_sort, (void *)argsright);
-            }
-        else{
-            argsright->v = v;
-            argsright->low = pivot_index+1;
-            argsright->high = high;
-            argsright->threaded = false;
-            argsright->lvl = arg->lvl + 1;
-            quick_sort(argsright);
-            }
+    // if (arg->threaded == true){
+    //     printf("Thread done nr: %d\n", arg->t_nr);
+    //     threads_done++;
+    //     // pthread_exit(NULL);
+    // }
 
     // if (argsleft->threaded == true && argsleft->threaded == true){
     //     for (int i = 0; i < AMOUNT_THREADS; i++){
@@ -168,6 +215,10 @@ quick_sort(ThreadArgs *arg)
     //     printf("Joining right thread from level: %d and nr: \033[0;31m %d \033[0;30m\n", argsright->lvl, argsright->t_nr);
     //     pthread_join(threads[argsright->t_nr], NULL);
     // }
+    if (arg->threaded == true){
+        // push(sp, arg->t_nr);
+        printf("Joining thread from level: %d and nr: \033[0;31m %d \033[0;37m\n", arg->lvl, arg->t_nr);
+    }
 
     free(argsleft);
     free(argsright);
@@ -179,6 +230,12 @@ main(int argc, char **argv)
     init_array();
     //print_array();
    // printf("Max LEVELS: %d\n", MAX_LEVELS);
+    // Stack s;
+    // sp = &s;
+    // initStack(sp);
+    // for (int i = 0; i < AMOUNT_THREADS-1; i++){
+    //     push(sp, i);
+    // }
     ThreadArgs arg;
     arg.v = v;
     arg.low = 0;
@@ -186,5 +243,9 @@ main(int argc, char **argv)
     arg.lvl = 0;
 
     quick_sort(&arg);
+    // while (threads_done != AMOUNT_THREADS-1){
+    //     // printf("total Threads done: %d\n", threads_done);
+    //     sleep(0.1);
+    // }
     //print_array();
 }
