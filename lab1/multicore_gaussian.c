@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Sequential version of Gaussian elimination
+ * Parallel version of Gaussian elimination
  *
  ***************************************************************************/
 
