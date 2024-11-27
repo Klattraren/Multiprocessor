@@ -4,7 +4,11 @@
 #include <chrono>
 #include <random>
 #define DEBUG false
+#define THREADS 2048
+#define BLOCKS 4
+#define THREADSPERBLOCK THREADS/BLOCKS
 using namespace std;
+
 
 // The odd-even sort algorithm
 // Total number of odd phases + even phases = the number of elements to sort
@@ -15,17 +19,15 @@ __device__ void swap_numbers(int* a, int* b)
     *b = tmp;
 }
 
-__global__ void oddeven_sort_kernel(int* numbers, int s)
+__global__ void oddeven_sort_kernel(int* numbers, int s, int i)
 {
+    // printf("Block: %d, Thread: %d\n", blockIdx.x, threadIdx.x);
     int odd_even;
-    for (int i = 1; i <= s; i++) {
-        odd_even = i %2;
-        for (int j = threadIdx.x*2+odd_even; j < s-1; j = j + 1024) {
-            if (numbers[j] > numbers[j + 1]) {
-                swap_numbers(&numbers[j], &numbers[j + 1]);
-            }
+    odd_even = i %2;
+    for (int j = ((blockIdx.x+1)*threadIdx.x)*2+odd_even; j < s-1; j = j + THREADSPERBLOCK) {
+        if (numbers[j] > numbers[j + 1]) {
+            swap_numbers(&numbers[j], &numbers[j + 1]);
         }
-        __syncthreads();
     }
 }
 
@@ -37,7 +39,10 @@ void oddeven_sort(std::vector<int>& numbers)
     cudaMalloc(&device_numbers, s * sizeof(int));
     cudaMemcpy(device_numbers, numbers.data(), s * sizeof(int), cudaMemcpyHostToDevice);
 
-    oddeven_sort_kernel<<<1, 1024>>>(device_numbers, s);
+    for (int i = 1; i <= s; i++) {
+        oddeven_sort_kernel<<<BLOCKS, THREADSPERBLOCK>>>(device_numbers, s, i);
+        // cudaDeviceSynchronize();
+    }
 
     cudaMemcpy(numbers.data(), device_numbers, s * sizeof(int), cudaMemcpyDeviceToHost);
     cudaFree(device_numbers);
