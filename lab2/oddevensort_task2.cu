@@ -4,14 +4,16 @@
 #include <chrono>
 #include <random>
 #define DEBUG false
-#define THREADS 128
-#define BLOCKS 4
-#define THREADSPERBLOCK THREADS/BLOCKS
+#define SIZE 100000
+#define THREADSPERBLOCK 1024
+#define BLOCKS (SIZE+THREADSPERBLOCK-1)/THREADSPERBLOCK
 using namespace std;
 
 
 // The odd-even sort algorithm
 // Total number of odd phases + even phases = the number of elements to sort
+
+//Swap function since we can't use std::swap in device code
 __device__ void swap_numbers(int* a, int* b)
 {
     int tmp = *a;
@@ -21,12 +23,16 @@ __device__ void swap_numbers(int* a, int* b)
 
 __global__ void oddeven_sort_kernel(int* numbers, int s, int i)
 {
-    int odd_even;
-    odd_even = i %2;
-    for (int j = ((blockIdx.x+1)*threadIdx.x)*2+odd_even; j < s-1; j = j + THREADSPERBLOCK) {
-        if (numbers[j] > numbers[j + 1]) {
-            swap_numbers(&numbers[j], &numbers[j + 1]);
-        }
+    //Calculating if the phase is odd or even
+    int odd_even = i % 2;
+
+    //Calculating wich index the thread is at a global level
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+
+    //Calculating the index of the next element to compare
+    int j = 2 * index + odd_even;
+    if (j < s - 1 && numbers[j] > numbers[j + 1]) {
+        swap_numbers(&numbers[j], &numbers[j + 1]);
     }
 }
 
@@ -35,13 +41,16 @@ void oddeven_sort(std::vector<int>& numbers)
     auto s = numbers.size();
     int* device_numbers;
 
+    //Allocating memory on the device
     cudaMalloc(&device_numbers, s * sizeof(int));
     cudaMemcpy(device_numbers, numbers.data(), s * sizeof(int), cudaMemcpyHostToDevice);
 
+    //Performing the sort looping trough all phases, doing this on the host side to sync the kernels
     for (int i = 1; i <= s; i++) {
         oddeven_sort_kernel<<<BLOCKS, THREADSPERBLOCK>>>(device_numbers, s, i);
     }
 
+    //Copying the sorted array back to the host and freeing memory on the device
     cudaMemcpy(numbers.data(), device_numbers, s * sizeof(int), cudaMemcpyDeviceToHost);
     cudaFree(device_numbers);
 }
@@ -52,6 +61,7 @@ void print_sort_status(std::vector<int> numbers)
 }
 
 void print_number(std::vector<int> numbers)
+//printfunction used to debugg code
 {
     for (auto number : numbers)
     {
@@ -62,9 +72,10 @@ void print_number(std::vector<int> numbers)
 
 int main()
 {
-    constexpr unsigned int size = 100000; // Number of elements in the input
+    constexpr unsigned int size = SIZE; // Number of elements in the input
     // Initialize a vector with integers of value 0
     std::vector<int> numbers(size);
+
     // Populate our vector with (pseudo)random numbers
     srand(time(0));
     std::generate(numbers.begin(), numbers.end(), rand);
