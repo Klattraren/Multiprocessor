@@ -3,7 +3,10 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#define DEBUG false
+#define THREADS 1024
 using namespace std;
+
 // The odd-even sort algorithm
 // Total number of odd phases + even phases = the number of elements to sort
 __device__ void swap_numbers(int* a, int* b)
@@ -15,11 +18,10 @@ __device__ void swap_numbers(int* a, int* b)
 
 __global__ void oddeven_sort_kernel(int* numbers, int s)
 {
-    // printf("ThreadIdx: %d\n", threadIdx.x);
     int odd_even;
     for (int i = 1; i <= s; i++) {
         odd_even = i %2;
-        for (int j = threadIdx.x*2+odd_even; j < s-1; j = j + 2048) {
+        for (int j = threadIdx.x*2+odd_even; j < s-1; j = j + THREADS) {
             if (numbers[j] > numbers[j + 1]) {
                 swap_numbers(&numbers[j], &numbers[j + 1]);
             }
@@ -36,7 +38,7 @@ void oddeven_sort(std::vector<int>& numbers)
     cudaMalloc(&device_numbers, s * sizeof(int));
     cudaMemcpy(device_numbers, numbers.data(), s * sizeof(int), cudaMemcpyHostToDevice);
 
-    oddeven_sort_kernel<<<1, 2048>>>(device_numbers, s);
+    oddeven_sort_kernel<<<1, THREADS>>>(device_numbers, s);
 
     cudaMemcpy(numbers.data(), device_numbers, s * sizeof(int), cudaMemcpyDeviceToHost);
     cudaFree(device_numbers);
@@ -59,26 +61,36 @@ void print_number(std::vector<int> numbers)
 int main()
 {
     constexpr unsigned int size = 100000; // Number of elements in the input
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> distrib(0, 100000);
-
     // Initialize a vector with integers of value 0
     std::vector<int> numbers(size);
     // Populate our vector with (pseudo)random numbers
     srand(time(0));
     std::generate(numbers.begin(), numbers.end(), rand);
 
-    // for (int i = 0; i < size; i++)
-    // {
-    //     numbers[i] = distrib(gen);
-    // }
-    // print_number(numbers);
+    //Debug mode for the code, setting random number from 0 to 100 for easier readability
+    if (DEBUG){
+        cout << "DEBUG MODE" << endl;
+
+
+        random_device rd;
+        mt19937 gen(rd());
+        uniform_int_distribution<> distrib(0, 100000);
+        for (int i = 0; i < size; i++)
+        {
+            numbers[i] = distrib(gen);
+        }
+        print_number(numbers);
+    }
+
     print_sort_status(numbers);
     auto start = std::chrono::steady_clock::now();
     oddeven_sort(numbers);
     auto end = std::chrono::steady_clock::now();
-    // print_number(numbers);
+
+    if (DEBUG){
+        print_number(numbers);
+    }
+
     print_sort_status(numbers);
     std::cout << "Elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
 }
