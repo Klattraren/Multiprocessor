@@ -15,19 +15,16 @@ __device__ void swap_numbers(int* a, int* b)
 
 __global__ void oddeven_sort_kernel(int* numbers, int s)
 {
+    // printf("ThreadIdx: %d\n", threadIdx.x);
+    int odd_even;
     for (int i = 1; i <= s; i++) {
-        // for (int j = i % 2; j < s-1; j = j + 2) {
-        //     if (numbers[j] > numbers[j + 1]) {
-        //         swap_numbers(&numbers[j], &numbers[j + 1]);
-        //     }
-        // }
-        for (int j = threadIdx.x; j < s-1; j = j + 32) {
+        odd_even = i %2;
+        for (int j = threadIdx.x*2+odd_even; j < s-1; j = j + 2048) {
             if (numbers[j] > numbers[j + 1]) {
                 swap_numbers(&numbers[j], &numbers[j + 1]);
             }
         }
         __syncthreads();
-        // printf("End of phase %d\n", i);
     }
 }
 
@@ -39,7 +36,7 @@ void oddeven_sort(std::vector<int>& numbers)
     cudaMalloc(&device_numbers, s * sizeof(int));
     cudaMemcpy(device_numbers, numbers.data(), s * sizeof(int), cudaMemcpyHostToDevice);
 
-    oddeven_sort_kernel<<<1, 32>>>(device_numbers, s);
+    oddeven_sort_kernel<<<1, 2048>>>(device_numbers, s);
 
     cudaMemcpy(numbers.data(), device_numbers, s * sizeof(int), cudaMemcpyDeviceToHost);
     cudaFree(device_numbers);
@@ -61,7 +58,7 @@ void print_number(std::vector<int> numbers)
 
 int main()
 {
-    constexpr unsigned int size = 100; // Number of elements in the input
+    constexpr unsigned int size = 100000; // Number of elements in the input
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(0, 100000);
@@ -80,7 +77,6 @@ int main()
     print_sort_status(numbers);
     auto start = std::chrono::steady_clock::now();
     oddeven_sort(numbers);
-    cudaDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
     // print_number(numbers);
     print_sort_status(numbers);
