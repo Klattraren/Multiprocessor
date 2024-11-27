@@ -22,7 +22,6 @@ __global__ void oddeven_sort_kernel(int* numbers, int s)
         //     }
         // }
         for (int j = threadIdx.x; j < s-1; j = j + 32) {
-            // printf("Thread %d sorts index: %d\n",threadIdx.x, j);
             if (numbers[j] > numbers[j + 1]) {
                 swap_numbers(&numbers[j], &numbers[j + 1]);
             }
@@ -62,7 +61,7 @@ void print_number(std::vector<int> numbers)
 
 int main()
 {
-    constexpr unsigned int size = 10000; // Number of elements in the input
+    constexpr unsigned int size = 100; // Number of elements in the input
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(0, 100000);
@@ -71,18 +70,19 @@ int main()
     std::vector<int> numbers(size);
     // Populate our vector with (pseudo)random numbers
     srand(time(0));
-    // std::generate(numbers.begin(), numbers.end(), rand);
-    for (int i = 0; i < size; i++)
-    {
-        numbers[i] = distrib(gen);
-    }
-    print_number(numbers);
+    std::generate(numbers.begin(), numbers.end(), rand);
+
+    // for (int i = 0; i < size; i++)
+    // {
+    //     numbers[i] = distrib(gen);
+    // }
+    // print_number(numbers);
     print_sort_status(numbers);
     auto start = std::chrono::steady_clock::now();
     oddeven_sort(numbers);
     cudaDeviceSynchronize();
     auto end = std::chrono::steady_clock::now();
-    print_number(numbers);
+    // print_number(numbers);
     print_sort_status(numbers);
     std::cout << "Elapsed time =  " << std::chrono::duration<double>(end - start).count() << " sec\n";
 }
