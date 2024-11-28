@@ -86,7 +86,7 @@ int main()
 
         random_device rd;
         mt19937 gen(rd());
-        uniform_int_distribution<> distrib(0, 100000);
+        uniform_int_distribution<> distrib(0, 100);
         for (int i = 0; i < size; i++)
         {
             numbers[i] = distrib(gen);
