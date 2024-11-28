@@ -77,7 +77,7 @@ division_step(double* d_A, double* d_b, double* d_y, int N, int k) {
     }
 }
 
-__global__ void 
+__global__ void
 under_elimination(double* d_A, double* d_b, double* d_y, int N, int k) {
     int i = blockIdx.x * blockDim.x + threadIdx.x; // Row
     int j = blockIdx.y * blockDim.y + threadIdx.y; // Column
@@ -87,7 +87,7 @@ under_elimination(double* d_A, double* d_b, double* d_y, int N, int k) {
         d_b[i] = d_b[i] - d_A[i * N + k] * d_y[k];
         d_A[i * N + k] = 0.0;
     }
-    
+
 }
 
 __global__ void
