@@ -41,16 +41,15 @@ main(int argc, char** argv)
 }
 __global__ void
 division_step(double* d_A, double* d_b, double* d_y, int N, int k) {
-    int j = threadIdx.x + blockIdx.x * blockDim.x; // Compute the column index j
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
 
     // Ensure j is within bounds for the current row k
     if (j > k && j < N) {
         d_A[k * N + j] = d_A[k * N + j]/d_A[k * N + k];  // Division step for row k
     }
 
-    __syncthreads(); // Ensure all threads finish before proceeding
+    __syncthreads(); // Ensure all threads in the block finish before proceeding
 
-    // Perform updates for y[k] and A[k][k] using a single thread
     if (threadIdx.x == 0 && blockIdx.x == 0) {
         d_y[k] = d_b[k] / d_A[k * N + k];
         d_A[k * N + k] = 1.0; // Set the diagonal element to 1.0
@@ -66,7 +65,7 @@ elimination_step(double* d_A, double* d_b, double* d_y, int N, int k){
     if ((i > k && i < N)&&(j > k && j < N)) {
         d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Elimination
     }
-    __syncthreads(); // Ensure all threads finish before proceeding
+    __syncthreads(); // Ensure all threads in the block finish before proceeding
     if (i > k && i < N) {
         d_b[i] = d_b[i] - (d_A[i * N + k] * d_y[k]);
         d_A[i * N + k] = 0.0;
@@ -81,7 +80,7 @@ additional_step(double* d_A, double* d_b, double* d_y, int N, int k) {
     if (i < k && j > k && j < N) {
         d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Additional Elimination
     }
-    __syncthreads(); // Ensure all threads finish before proceeding
+    __syncthreads(); // Ensure all threads in the block finish before proceeding
     if (i < k) {
         d_y[i] = d_y[i] - (d_A[i * N + k] * d_y[k]);
         d_A[i * N + k] = 0.0;
