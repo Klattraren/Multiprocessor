@@ -29,7 +29,7 @@ int Read_Options(int, char**);
 int
 main(int argc, char** argv)
 {
-    printf("Gauss Jordan\n");
+    printf("Gauss Jordan MultiProcessed\n");
     int i, timestart, timeend, iter;
 
     Init_Default();		/* Init default values	*/
@@ -98,7 +98,6 @@ work(void)
     double* d_y;
     int k;
     int nr_blocks = (N*N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    printf("Blocks: %d, Threads per block: %d\n", nr_blocks, THREADS_PER_BLOCK);
 
     // Allocate memory on device
     cudaMalloc((void**)&d_A, N * N * sizeof(double));
