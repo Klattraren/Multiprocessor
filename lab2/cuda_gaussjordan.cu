@@ -23,6 +23,7 @@ double	y[MAX_SIZE];	/* vector y             */
 void work(double*, double*, double*);
 void Init_Matrix(void);
 void Print_Matrix(void);
+void Print_d_Matrix(double*, double*);
 void Init_Default(void);
 int Read_Options(int, char**);
 
@@ -67,12 +68,13 @@ main(int argc, char** argv)
 
 
 __global__ void
-division_step(double* d_A, double* d_b, double* d_y, int N, int k) {
-    int j = blockIdx.x * blockDim.x + threadIdx.x; // Column
+division_step(double* d_A, double pivot, double* d_b, double* d_y, int N, int k) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x; 
 
-    if (j < N) {
+    if (j != k && j < N) {
         d_A[k * N + j] = d_A[k * N + j] / d_A[k * N + k];
-        d_y[k] = d_b[k] / d_A[k * N + k];
+        // printf("d_y=%f, d_b[k]=%f, d_A[k * N + k]=%f\n", d_y[k], d_b[k], d_A[k * N + k]);
+        d_y[k] = d_b[k] / pivot;
         d_A[k * N + k] = 1.0;
     }
 }
@@ -82,8 +84,10 @@ under_elimination(double* d_A, double* d_b, double* d_y, int N, int k) {
     int i = blockIdx.x * blockDim.x + threadIdx.x; // Row
     int j = blockIdx.y * blockDim.y + threadIdx.y; // Column
 
-    if (i < N && j < N && i > k) {
+    if (i < N && j < N && i >= k && j >= k) {
+        printf("i=%d, j=%d, N=%d \n", i, j, N);
         d_A[i * N + j] = d_A[i * N + j] - d_A[i * N + k] * d_A[k * N + j];
+        printf("d_A[i * N + j]=%f, d_A[i * N + k]=%f, d_A[k * N + j]=%f\n", d_A[i * N + j], d_A[i * N + k], d_A[k * N + j]);
         d_b[i] = d_b[i] - d_A[i * N + k] * d_y[k];
         d_A[i * N + k] = 0.0;
     }
@@ -108,19 +112,31 @@ work(double* d_A, double* d_b, double* d_y)
 {
     int i, j, k;
 
-    int blockSize = 256;
-    int numBlocks = (N + blockSize - 1) / blockSize;
+    int blockSize = 16;
+    dim3 blockShape = dim3(blockSize, blockSize);
+    dim3 gridShape = dim3((N + blockSize - 1) / blockSize, (N + blockSize - 1) / blockSize);
 
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
     for (k = 0; k < N; k++) { /* Outer loop */
-        division_step<<<numBlocks, blockSize>>>(d_A, d_b, d_y, N, k);
+        double pivot;
+        cudaMemcpy(&pivot, &d_A[k * N + k], sizeof(double), cudaMemcpyDeviceToHost);
+        division_step<<<gridShape, blockShape>>>(d_A, pivot, d_b, d_y, N, k);
         cudaDeviceSynchronize();
+        // d_y[k] = b[k] / d_A[k * N + k];
+        // printf("d_y: %f\n", y[k]);
+        printf("Division step\n");
+        Print_d_Matrix(d_A, d_y);
 
-        under_elimination<<<numBlocks, blockSize>>>(d_A, d_b, d_y, N, k);
+        under_elimination<<<gridShape, blockShape>>>(d_A, d_b, d_y, N, k);
         cudaDeviceSynchronize();
+        printf("Under elimination\n");
+        Print_d_Matrix(d_A, d_y);
 
-        upper_elimination<<<numBlocks, blockSize>>>(d_A, d_b, d_y, N, k);
+        upper_elimination<<<gridShape, blockShape>>>(d_A, d_b, d_y, N, k);
         cudaDeviceSynchronize();
+        printf("Upper elimination\n");
+        Print_d_Matrix(d_A, d_y);
+
     }
 }
 
@@ -171,7 +187,7 @@ Init_Matrix()
 void
 Print_Matrix()
 {
-    int i, j;
+    int i,j;
 
     printf("Matrix A:\n");
     for (i = 0; i < N; i++) {
@@ -183,6 +199,28 @@ Print_Matrix()
     printf("Vector y:\n[");
     for (j = 0; j < N; j++)
         printf(" %5.2f,", y[j]);
+    printf("]\n");
+    printf("\n\n");
+}
+
+void
+Print_d_Matrix(double* d_A, double* d_y){
+    int i, j;
+    double* print_A = (double*)malloc(N * N * sizeof(double));
+    double* print_y = (double*)malloc(N * sizeof(double));
+    cudaMemcpy(print_A, d_A, N * N * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(print_y, d_y, N * sizeof(double), cudaMemcpyDeviceToHost);
+
+    printf("Matrix d_A:\n");
+    for (i = 0; i < N; i++) {
+        printf("[");
+        for (j = 0; j < N; j++)
+            printf(" %5.2f,", print_A[i * N + j]);
+        printf("]\n");
+    }
+    printf("Vector y:\n[");
+    for (j = 0; j < N; j++)
+        printf(" %5.2f,", print_y[j]);
     printf("]\n");
     printf("\n\n");
 }
