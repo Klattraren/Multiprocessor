@@ -45,7 +45,7 @@ division_step(double* d_A, double* d_b, double* d_y, int N, int k) {
 
     // Ensure j is within bounds for the current row k
     if (j > k && j < N) {
-        d_A[k * N + j] /= d_A[k * N + k];  // Division step for row k
+        d_A[k * N + j] = d_A[k * N + j]/d_A[k * N + k];  // Division step for row k
     }
 
     __syncthreads(); // Ensure all threads finish before proceeding
@@ -64,11 +64,11 @@ elimination_step(double* d_A, double* d_b, double* d_y, int N, int k){
     int i = index / N;
     int j = index % N;
     if ((i > k && i < N)&&(j > k && j < N)) {
-        d_A[i * N + j] -= d_A[i * N + k] * d_A[k * N + j];  // Elimination
+        d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Elimination
     }
     __syncthreads(); // Ensure all threads finish before proceeding
     if (i > k && i < N) {
-        d_b[i] -= d_A[i * N + k] * d_y[k];
+        d_b[i] = d_b[i] - (d_A[i * N + k] * d_y[k]);
         d_A[i * N + k] = 0.0;
     }
 }
@@ -79,11 +79,11 @@ additional_step(double* d_A, double* d_b, double* d_y, int N, int k) {
     int i = index / N;
     int j = index % N;
     if (i < k && j > k && j < N) {
-        d_A[i * N + j] -= d_A[i * N + k] * d_A[k * N + j];  // Additional Elimination
+        d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Additional Elimination
     }
     __syncthreads(); // Ensure all threads finish before proceeding
     if (i < k) {
-        d_y[i] -= d_A[i * N + k] * d_y[k];
+        d_y[i] = d_y[i] - (d_A[i * N + k] * d_y[k]);
         d_A[i * N + k] = 0.0;
     }
 }

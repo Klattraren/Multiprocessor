@@ -52,19 +52,13 @@ work(void)
         y[k] = b[k] / A[k][k];
         A[k][k] = 1.0;
 
-
-        printf("Division step \n");
-        Print_Matrix();
-
         for (i = k + 1; i < N; i++) {
             for (j = k + 1; j < N; j++)
-                printf("A[%d][%d]=%f, A[%d][%d]=%f, A[%d][%d]=%f\n", i, j, A[i][j], i, k, A[i][k], k, j, A[k][j]);
+                // printf("A[%d][%d]=%f, A[%d][%d]=%f, A[%d][%d]=%f\n", i, j, A[i][j], i, k, A[i][k], k, j, A[k][j]);
                 A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Elimination step */
             b[i] = b[i] - A[i][k] * y[k];
             A[i][k] = 0.0;
         }
-        printf("Under Elimination \n");
-        Print_Matrix();
 
         for (i = 0; i < k; i++) {
             for (j = k + 1; j < N; j++)
@@ -72,9 +66,6 @@ work(void)
             y[i] = y[i] - A[i][k] * y[k];
             A[i][k] = 0.0;
         }
-        printf("Upper Elimination \n");
-        Print_Matrix();
-
     }
 }
 
