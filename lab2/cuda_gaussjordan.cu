@@ -5,9 +5,9 @@
  ***************************************************************************/
 
 #include <stdio.h>
-#include <cuda_runtime.h>
 
 #define MAX_SIZE 4096
+#define THREADS_PER_BLOCK 1024
 
 typedef double matrix[MAX_SIZE * MAX_SIZE];
 
@@ -20,26 +20,84 @@ double	b[MAX_SIZE];	/* vector b             */
 double	y[MAX_SIZE];	/* vector y             */
 
 /* forward declarations */
-void work(double*, double*, double*);
+void work(void);
 void Init_Matrix(void);
 void Print_Matrix(void);
-void Print_d_Matrix(double*, double*);
 void Init_Default(void);
 int Read_Options(int, char**);
 
 int
 main(int argc, char** argv)
 {
-    printf("Gauss Jordan\n");
+    printf("Gauss Jordan MultiProcessed\n");
+    int i, timestart, timeend, iter;
 
     Init_Default();		/* Init default values	*/
     Read_Options(argc, argv);	/* Read arguments	*/
     Init_Matrix();		/* Init the matrix	*/
+    work();
+    if (PRINT == 1)
+        Print_Matrix();
+}
+__global__ void
+division_step(double* d_A, double* d_b, double* d_y, int N, int k) {
+    int j = threadIdx.x + blockIdx.x * blockDim.x; // Compute the column index j
 
+    // Ensure j is within bounds for the current row k
+    if (j > k && j < N) {
+        d_A[k * N + j] = d_A[k * N + j]/d_A[k * N + k];  // Division step for row k
+    }
+
+    __syncthreads(); // Ensure all threads finish before proceeding
+
+    // Perform updates for y[k] and A[k][k] using a single thread
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        d_y[k] = d_b[k] / d_A[k * N + k];
+        d_A[k * N + k] = 1.0; // Set the diagonal element to 1.0
+    }
+}
+
+
+__global__ void
+elimination_step(double* d_A, double* d_b, double* d_y, int N, int k){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = index / N;
+    int j = index % N;
+    if ((i > k && i < N)&&(j > k && j < N)) {
+        d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Elimination
+    }
+    __syncthreads(); // Ensure all threads finish before proceeding
+    if (i > k && i < N) {
+        d_b[i] = d_b[i] - (d_A[i * N + k] * d_y[k]);
+        d_A[i * N + k] = 0.0;
+    }
+}
+
+__global__ void
+additional_step(double* d_A, double* d_b, double* d_y, int N, int k) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = index / N;
+    int j = index % N;
+    if (i < k && j > k && j < N) {
+        d_A[i * N + j] = d_A[i * N + j] - (d_A[i * N + k] * d_A[k * N + j]);  // Additional Elimination
+    }
+    __syncthreads(); // Ensure all threads finish before proceeding
+    if (i < k) {
+        d_y[i] = d_y[i] - (d_A[i * N + k] * d_y[k]);
+        d_A[i * N + k] = 0.0;
+    }
+}
+
+
+
+void
+work(void)
+{
     double* d_A;
     double* d_b;
     double* d_y;
-
+    int k;
+    int nr_blocks = (N*N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     // Allocate memory on device
     cudaMalloc((void**)&d_A, N * N * sizeof(double));
@@ -51,8 +109,17 @@ main(int argc, char** argv)
     cudaMemcpy(d_b, b, N * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_y, y, N * sizeof(double), cudaMemcpyHostToDevice);
 
-    work(d_A, d_b, d_y);
+    // Call the kernel
+    for (k = 0; k < N; k++) {
+        division_step<<<nr_blocks, THREADS_PER_BLOCK>>>(d_A, d_b, d_y, N, k);
+        cudaDeviceSynchronize();
 
+        elimination_step<<<nr_blocks, THREADS_PER_BLOCK>>>(d_A, d_b, d_y, N, k);
+        cudaDeviceSynchronize();
+
+        additional_step<<<nr_blocks, THREADS_PER_BLOCK>>>(d_A, d_b, d_y, N, k);
+        cudaDeviceSynchronize();
+    }
     // Copy data back to host
     cudaMemcpy(A, d_A, N * N * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(b, d_b, N * sizeof(double), cudaMemcpyDeviceToHost);
@@ -61,86 +128,7 @@ main(int argc, char** argv)
     cudaFree(d_A);
     cudaFree(d_b);
     cudaFree(d_y);
-
-    if (PRINT == 1)
-        Print_Matrix();
 }
-
-
-__global__ void
-division_step(double* d_A, double pivot, double* d_b, double* d_y, int N, int k) {
-    int j = blockIdx.x * blockDim.x + threadIdx.x; 
-
-    if (j != k && j < N) {
-        d_A[k * N + j] = d_A[k * N + j] / d_A[k * N + k];
-        // printf("d_y=%f, d_b[k]=%f, d_A[k * N + k]=%f\n", d_y[k], d_b[k], d_A[k * N + k]);
-        d_y[k] = d_b[k] / pivot;
-        d_A[k * N + k] = 1.0;
-    }
-}
-
-__global__ void
-under_elimination(double* d_A, double* d_b, double* d_y, int N, int k) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x; // Row
-    int j = blockIdx.y * blockDim.y + threadIdx.y; // Column
-
-    if (i < N && j < N && i >= k && j >= k) {
-        printf("i=%d, j=%d, N=%d \n", i, j, N);
-        d_A[i * N + j] = d_A[i * N + j] - d_A[i * N + k] * d_A[k * N + j];
-        printf("d_A[i * N + j]=%f, d_A[i * N + k]=%f, d_A[k * N + j]=%f\n", d_A[i * N + j], d_A[i * N + k], d_A[k * N + j]);
-        d_b[i] = d_b[i] - d_A[i * N + k] * d_y[k];
-        d_A[i * N + k] = 0.0;
-    }
-
-}
-
-__global__ void
-upper_elimination(double* d_A, double* d_b, double* d_y, int N, int k) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x; // Row
-    int j = blockIdx.y * blockDim.y + threadIdx.y; // Column
-
-    if (i < N && j < N && i < k) {
-        d_A[i * N + j] = d_A[i * N + j] - d_A[i * N + k] * d_A[k * N + j];
-        d_b[i] = d_b[i] - d_A[i * N + k] * d_y[k];
-        d_A[i * N + k] = 0.0;
-    }
-}
-
-
-void
-work(double* d_A, double* d_b, double* d_y)
-{
-    int i, j, k;
-
-    int blockSize = 16;
-    dim3 blockShape = dim3(blockSize, blockSize);
-    dim3 gridShape = dim3((N + blockSize - 1) / blockSize, (N + blockSize - 1) / blockSize);
-
-    /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    for (k = 0; k < N; k++) { /* Outer loop */
-        double pivot;
-        cudaMemcpy(&pivot, &d_A[k * N + k], sizeof(double), cudaMemcpyDeviceToHost);
-        division_step<<<gridShape, blockShape>>>(d_A, pivot, d_b, d_y, N, k);
-        cudaDeviceSynchronize();
-        // d_y[k] = b[k] / d_A[k * N + k];
-        // printf("d_y: %f\n", y[k]);
-        printf("Division step\n");
-        Print_d_Matrix(d_A, d_y);
-
-        under_elimination<<<gridShape, blockShape>>>(d_A, d_b, d_y, N, k);
-        cudaDeviceSynchronize();
-        printf("Under elimination\n");
-        Print_d_Matrix(d_A, d_y);
-
-        upper_elimination<<<gridShape, blockShape>>>(d_A, d_b, d_y, N, k);
-        cudaDeviceSynchronize();
-        printf("Upper elimination\n");
-        Print_d_Matrix(d_A, d_y);
-
-    }
-}
-
-
 
 void
 Init_Matrix()
@@ -187,7 +175,7 @@ Init_Matrix()
 void
 Print_Matrix()
 {
-    int i,j;
+    int i, j;
 
     printf("Matrix A:\n");
     for (i = 0; i < N; i++) {
@@ -199,28 +187,6 @@ Print_Matrix()
     printf("Vector y:\n[");
     for (j = 0; j < N; j++)
         printf(" %5.2f,", y[j]);
-    printf("]\n");
-    printf("\n\n");
-}
-
-void
-Print_d_Matrix(double* d_A, double* d_y){
-    int i, j;
-    double* print_A = (double*)malloc(N * N * sizeof(double));
-    double* print_y = (double*)malloc(N * sizeof(double));
-    cudaMemcpy(print_A, d_A, N * N * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(print_y, d_y, N * sizeof(double), cudaMemcpyDeviceToHost);
-
-    printf("Matrix d_A:\n");
-    for (i = 0; i < N; i++) {
-        printf("[");
-        for (j = 0; j < N; j++)
-            printf(" %5.2f,", print_A[i * N + j]);
-        printf("]\n");
-    }
-    printf("Vector y:\n[");
-    for (j = 0; j < N; j++)
-        printf(" %5.2f,", print_y[j]);
     printf("]\n");
     printf("\n\n");
 }
