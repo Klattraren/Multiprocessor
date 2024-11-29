@@ -1,3 +1,12 @@
+/***************************************************************************
+ *
+ * Paralell version of task 2, Odd-Even sort
+ *
+ * Author: Samuel Nyberg, sany21@student.bth.se
+ * Author: Tobias Mattsson, tomt21@student.bth.se
+ *
+ ***************************************************************************/
+
 #include <vector>
 #include <algorithm>
 #include <iostream>

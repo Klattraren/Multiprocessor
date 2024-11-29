@@ -2,6 +2,9 @@
  *
  * Paralell version of Gauss-Jordan row reduction
  *
+ * Author: Samuel Nyberg, sany21@student.bth.se
+ * Author: Tobias Mattsson, tomt21@student.bth.se
+ *
  ***************************************************************************/
 
 #include <stdio.h>
@@ -89,8 +92,6 @@ additional_step(double* d_A, double* d_b, double* d_y, int N, int k) {
         d_A[i * N + k] = 0.0;
     }
 }
-
-
 
 
 void
